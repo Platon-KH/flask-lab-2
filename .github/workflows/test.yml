@@ -24,16 +24,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Test import
+    - name: Test imports
       run: |
         python -c "from part.lottery import api; print('✓ API module loaded')"
         python -c "from part.models import ticket_model; print('✓ Models loaded')"
     
-    - name: Test Flask app starts
-      run: |
-        python -c "
-import time
-import threading
-from main import app
-print('✓ Flask app imported successfully')
-"
+    - name: Test Flask app
+      run: python -c "from main import app; print('✓ Flask app imported')"
