@@ -14,6 +14,7 @@ RESTful веб-сервис для управления лотерейными �
 ```bash
 cd ~
 git clone https://github.com/Platon-KH/lab2-lottery.git
+токен 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
 cd lab2-lottery
 pip install -r requirements.txt
 python main.py
