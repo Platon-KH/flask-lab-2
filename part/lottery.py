@@ -1,6 +1,5 @@
 from flask_restx import Namespace, Resource, fields
 from .models import ticket_model, stats_model
-import random
 from datetime import datetime
 
 # Создаем namespace для лотереи
@@ -76,7 +75,7 @@ class TicketResource(Resource):
     @api.expect(ticket)
     @api.marshal_with(ticket)
     def put(self, id):
-        """Обновить билет"""
+        """Полностью обновить билет"""
         for i, ticket in enumerate(tickets):
             if ticket['id'] == id:
                 updated = api.payload
@@ -93,6 +92,27 @@ class TicketResource(Resource):
         tickets = [t for t in tickets if t['id'] != id]
         return '', 204
 
+@api.route('/tickets/<string:id>/status')
+@api.response(404, 'Билет не найден')
+@api.param('id', 'Идентификатор билета')
+class TicketStatusPatch(Resource):
+    @api.doc('patch_ticket_status')
+    @api.expect(api.model('StatusPatch', {
+        'status': fields.String(required=True, description='Новый статус (sold/available/winning)')
+    }))
+    @api.marshal_with(ticket)
+    def patch(self, id):
+        for ticket in tickets:
+            if ticket['id'] == id:
+                data = api.payload
+                if 'status' in data:
+                    ticket['status'] = data['status']
+                    # Если билет продан, добавляем дату
+                    if data['status'] == 'sold' and not ticket.get('purchase_date'):
+                        ticket['purchase_date'] = datetime.now().strftime('%Y-%m-%d')
+                return ticket
+        api.abort(404, f"Билет {id} не найден")
+
 @api.route('/stats')
 class TicketStats(Resource):
     @api.doc('get_stats')
@@ -100,7 +120,7 @@ class TicketStats(Resource):
     def get(self):
         """Получить статистику по лотерее"""
         total = len(tickets)
-        sold = sum(1 for t in tickets if t['status'] == 'sold')
+        sold = sum(1 for t in tickets if t['status'] in ['sold', 'winning'])
         winning = sum(1 for t in tickets if t['status'] == 'winning')
         revenue = sum(t['price'] for t in tickets if t['status'] in ['sold', 'winning'])
         prizes = sum(t['prize_amount'] for t in tickets)
@@ -119,19 +139,28 @@ class TicketStats(Resource):
 
 @api.route('/tickets/sort/<string:field>')
 @api.param('field', 'Поле для сортировки (price, number, status)')
-@api.param('order', 'Порядок сортировки (asc/desc)')
 class TicketSort(Resource):
-    @api.doc('sort_tickets')
+    @api.doc('sort_tickets_asc')
     @api.marshal_list_with(ticket)
     def get(self, field):
-        """Сортировать билеты по указанному полю"""
-        order = api.payload.get('order', 'asc') if api.payload else 'asc'
-        
+        """Сортировать билеты по указанному полю (по возрастанию)"""
         valid_fields = ['price', 'number', 'status']
         if field not in valid_fields:
             api.abort(400, f"Поле должно быть одним из: {valid_fields}")
         
-        sorted_tickets = sorted(tickets, 
-                               key=lambda x: x.get(field, ''),
-                               reverse=(order == 'desc'))
+        sorted_tickets = sorted(tickets, key=lambda x: x.get(field, ''))
+        return sorted_tickets
+
+@api.route('/tickets/sort/<string:field>/desc')
+@api.param('field', 'Поле для сортировки (price, number, status)')
+class TicketSortDesc(Resource):
+    @api.doc('sort_tickets_desc')
+    @api.marshal_list_with(ticket)
+    def get(self, field):
+        """Сортировать билеты по указанному полю (по убыванию)"""
+        valid_fields = ['price', 'number', 'status']
+        if field not in valid_fields:
+            api.abort(400, f"Поле должно быть одним из: {valid_fields}")
+        
+        sorted_tickets = sorted(tickets, key=lambda x: x.get(field, ''), reverse=True)
         return sorted_tickets
